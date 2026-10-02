@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Six Cities · Clocks · News · Weather</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f6fa;--card:#fff;--fg:#1d2430;--mut:#667;--bd:#d5d9e0;--day:#fffdf2;--night:#25314a;--hand:#1d2430;--acc:#2f6fe4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1319;--card:#171c25;--fg:#e6e9ef;--mut:#9aa3b2;--bd:#323a47;--day:#3a3a30;--night:#0d1220;--hand:#e6e9ef;--acc:#6aa0ff}}
+:root[data-theme="dark"]{--bg:#0f1319;--card:#171c25;--fg:#e6e9ef;--mut:#9aa3b2;--bd:#323a47;--day:#3a3a30;--night:#0d1220;--hand:#e6e9ef;--acc:#6aa0ff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;padding:18px;max-width:1200px;margin-inline:auto}
+h1{font-size:20px;margin:0 0 4px}.s{color:var(--mut);margin:0 0 14px}
+.top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+button{background:var(--fg);color:var(--bg);border:0;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+select{width:100%;padding:7px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font-size:14px}
+svg.ck{width:190px;height:190px}svg .t{stroke:var(--fg);stroke-width:2}svg text{fill:var(--fg);font:600 11px system-ui}
+.dg{font:600 22px ui-monospace,Menlo,monospace}.dt{color:var(--mut);margin-top:-6px}
+.cw{position:relative}.fl{position:absolute;top:0;right:-8px;font-size:28px;line-height:1;z-index:1}
+.w{width:100%;border-top:1px solid var(--bd);padding-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.w b{font-size:24px}.n{width:100%;font-size:13px}a{color:var(--acc)}
+</style></head><body>
+<h1>Six cities · analog clocks · news · weather</h1>
+<p class="s">Each card has its own selector (~65 major cities, all above 500k people). Weather is a <b>typical climate estimate</b> for the city's current date and hour — live weather can't be fetched inside a published page, so each card links to a live forecast.</p>
+<div class="top"><button id="rnd">🎲 Random cities</button><button id="u">Switch °C / °F</button></div>
+<div class="grid" id="g"></div>
+<script>
+// name, country, IANA tz, mean annual °C, seasonal amplitude (negative = southern hemisphere), [news name|url]
+const D=[
+["Addis Ababa","ET","Africa/Addis_Ababa",16,1],["Algiers","DZ","Africa/Algiers",18,7],["Athens","GR","Europe/Athens",18,10,"Kathimerini|https://www.ekathimerini.com"],
+["Baghdad","IQ","Asia/Baghdad",24,13],["Bangalore","IN","Asia/Kolkata",24,3,"Deccan Herald|https://www.deccanherald.com"],["Bangkok","TH","Asia/Bangkok",29,2,"Bangkok Post|https://www.bangkokpost.com"],
+["Beijing","CN","Asia/Shanghai",13,15,"China Daily|https://www.chinadaily.com.cn"],["Berlin","DE","Europe/Berlin",10,10,"Der Tagesspiegel|https://www.tagesspiegel.de"],["Bogotá","CO","America/Bogota",14,.5,"El Tiempo|https://www.eltiempo.com"],
+["Buenos Aires","AR","America/Argentina/Buenos_Aires",18,-7,"Clarín|https://www.clarin.com"],["Cairo","EG","Africa/Cairo",22,8,"Ahram Online|https://english.ahram.org.eg"],["Cape Town","ZA","Africa/Johannesburg",17,-4,"News24|https://www.news24.com"],
+["Casablanca","MA","Africa/Casablanca",18,5],["Chennai","IN","Asia/Kolkata",29,3,"The Hindu|https://www.thehindu.com"],["Chicago","US","America/Chicago",10,14,"Chicago Tribune|https://www.chicagotribune.com"],
+["Delhi","IN","Asia/Kolkata",25,9,"The Hindu|https://www.thehindu.com"],["Dhaka","BD","Asia/Dhaka",26,5,"The Daily Star|https://www.thedailystar.net"],["Dubai","AE","Asia/Dubai",28,8,"Gulf News|https://gulfnews.com"],
+["Hanoi","VN","Asia/Ho_Chi_Minh",24,7,"VnExpress|https://e.vnexpress.net"],["Ho Chi Minh City","VN","Asia/Ho_Chi_Minh",28,2,"VnExpress|https://e.vnexpress.net"],["Hong Kong","HK","Asia/Hong_Kong",23,7,"SCMP|https://www.scmp.com"],
+["Houston","US","America/Chicago",21,9,"Houston Chronicle|https://www.houstonchronicle.com"],["Hyderabad","IN","Asia/Kolkata",26,5],["Istanbul","TR","Europe/Istanbul",15,10,"Hürriyet Daily News|https://www.hurriyetdailynews.com"],
+["Jakarta","ID","Asia/Jakarta",27,1,"The Jakarta Post|https://www.thejakartapost.com"],["Johannesburg","ZA","Africa/Johannesburg",16,-5,"News24|https://www.news24.com"],["Karachi","PK","Asia/Karachi",26,6,"Dawn|https://www.dawn.com"],
+["Kinshasa","CD","Africa/Kinshasa",25,1],["Kolkata","IN","Asia/Kolkata",27,4,"The Telegraph|https://www.telegraphindia.com"],["Kuala Lumpur","MY","Asia/Kuala_Lumpur",28,1,"The Star|https://www.thestar.com.my"],
+["Kyiv","UA","Europe/Kyiv",9,12,"Kyiv Independent|https://kyivindependent.com"],["Lagos","NG","Africa/Lagos",27,2,"Punch|https://punchng.com"],["Lahore","PK","Asia/Karachi",24,10,"Dawn|https://www.dawn.com"],
+["Lima","PE","America/Lima",19,-4,"El Comercio|https://elcomercio.pe"],["Lisbon","PT","Europe/Lisbon",17,6,"Público|https://www.publico.pt"],["London","GB","Europe/London",11,7,"BBC News London|https://www.bbc.com/news/england/london"],
+["Los Angeles","US","America/Los_Angeles",18,5,"Los Angeles Times|https://www.latimes.com"],["Madrid","ES","Europe/Madrid",15,10,"El País|https://elpais.com"],["Manila","PH","Asia/Manila",28,2,"Inquirer|https://www.inquirer.net"],
+["Melbourne","AU","Australia/Melbourne",15,-5,"The Age|https://www.theage.com.au"],["Mexico City","MX","America/Mexico_City",17,3,"El Universal|https://www.eluniversal.com.mx"],["Moscow","RU","Europe/Moscow",6,14,"The Moscow Times|https://www.themoscowtimes.com"],
+["Mumbai","IN","Asia/Kolkata",27,3,"Times of India|https://timesofindia.indiatimes.com"],["Nairobi","KE","Africa/Nairobi",19,-1,"Daily Nation|https://nation.africa"],["New York","US","America/New_York",13,12,"The New York Times|https://www.nytimes.com/section/nyregion"],
+["Osaka","JP","Asia/Tokyo",16,11,"Mainichi|https://mainichi.jp/english"],["Paris","FR","Europe/Paris",12,8,"Le Monde|https://www.lemonde.fr"],["Rio de Janeiro","BR","America/Sao_Paulo",24,-3,"O Globo|https://oglobo.globo.com"],
+["Riyadh","SA","Asia/Riyadh",26,11,"Arab News|https://www.arabnews.com"],["Rome","IT","Europe/Rome",16,8,"la Repubblica|https://www.repubblica.it"],["Santiago","CL","America/Santiago",14,-6,"La Tercera|https://www.latercera.com"],
+["São Paulo","BR","America/Sao_Paulo",20,-4,"Folha de S.Paulo|https://www.folha.uol.com.br"],["Seoul","KR","Asia/Seoul",12,14,"The Korea Herald|https://www.koreaherald.com"],["Shanghai","CN","Asia/Shanghai",17,12,"Sixth Tone|https://www.sixthtone.com"],
+["Singapore","SG","Asia/Singapore",28,1,"The Straits Times|https://www.straitstimes.com"],["Sydney","AU","Australia/Sydney",18,-5,"Sydney Morning Herald|https://www.smh.com.au"],["Taipei","TW","Asia/Taipei",23,7,"Focus Taiwan|https://focustaiwan.tw"],
+["Tehran","IR","Asia/Tehran",18,13,"Tehran Times|https://www.tehrantimes.com"],["Tel Aviv","IL","Asia/Jerusalem",21,7,"Haaretz|https://www.haaretz.com"],["Tokyo","JP","Asia/Tokyo",16,10,"NHK World|https://www3.nhk.or.jp/nhkworld/"],
+["Toronto","CA","America/Toronto",9,14,"Toronto Star|https://www.thestar.com"],["Vancouver","CA","America/Vancouver",10,7,"Vancouver Sun|https://vancouversun.com"],["Vienna","AT","Europe/Vienna",10,11,"Der Standard|https://www.derstandard.at"],["Warsaw","PL","Europe/Warsaw",9,11,"Notes from Poland|https://notesfrompoland.com"]];
+const DEF=["Athens","London","New York","Tokyo","Sydney","Dubai"];
+let F=false;const cards=[];
+const fmtT=v=>F?Math.round(v*9/5+32)+'°F':Math.round(v)+'°C';
+function mk(name){
+ const el=document.createElement('div');el.className='card';
+ let ticks='';for(let i=0;i<60;i++){const a=i*6,l=i%5?3:8;ticks+=`<line class="t" style="stroke-width:${i%5?1:2}" x1="0" y1="-${92}" x2="0" y2="-${92-l}" transform="rotate(${a})"/>`}
+ el.innerHTML=`<select>${D.map(c=>`<option ${c[0]===name?'selected':''}>${c[0]}, ${c[1]}</option>`).join('')}</select>
+ <div class="cw"><span class="fl"></span><svg class="ck" viewBox="-100 -100 200 200"><circle class="f" r="97" stroke="var(--fg)" stroke-width="3"/>${ticks}
+ <text y="-74" text-anchor="middle">12</text><text x="76" y="4" text-anchor="middle">3</text><text y="82" text-anchor="middle">6</text><text x="-76" y="4" text-anchor="middle">9</text>
+ <line class="hh" y2="-48" stroke="var(--hand)" stroke-width="5" stroke-linecap="round"/><line class="mh" y2="-72" stroke="var(--hand)" stroke-width="3.5" stroke-linecap="round"/><line class="sh" y2="-80" y1="14" stroke="#e63946" stroke-width="1.6"/><circle r="4" fill="#e63946"/></svg></div>
+ <div class="dg"></div><div class="dt"></div><div class="w"></div><div class="n"></div>`;
+ const st={el,name,f:null};
+ el.querySelector('select').onchange=e=>{st.name=e.target.value.split(',')[0]==='Ho Chi Minh City'?'Ho Chi Minh City':e.target.value.replace(/, [A-Z]{2}$/,'');st.f=null;upd(st)};
+ cards.push(st);document.getElementById('g').appendChild(el);upd(st);
+}
+function info(st){const c=D.find(x=>x[0]===st.name);if(!st.f)st.f=new Intl.DateTimeFormat('en-GB',{timeZone:c[2],weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'});return c}
+function upd(st){
+ const c=info(st),p={};st.f.formatToParts(new Date()).forEach(x=>p[x.type]=x.value);
+ const h=+p.hour,m=+p.minute,s=+p.second,q=st.el;
+ q.querySelector('.hh').setAttribute('transform',`rotate(${(h%12)*30+m*.5})`);
+ q.querySelector('.mh').setAttribute('transform',`rotate(${m*6+s*.1})`);
+ q.querySelector('.sh').setAttribute('transform',`rotate(${s*6})`);
+ q.querySelector('.f').setAttribute('fill',h>=6&&h<18?'var(--day)':'var(--night)');
+ const fl=q.querySelector('.fl');fl.textContent=String.fromCodePoint(...[...c[1]].map(ch=>127397+ch.charCodeAt(0)));fl.title=c[0]+' ('+c[1]+')';
+ const z=n=>String(n).padStart(2,'0');
+ q.querySelector('.dg').textContent=`${z(h)}:${z(m)}:${z(s)}`;
+ q.querySelector('.dt').textContent=`${p.weekday}, ${p.day} ${p.month} ${p.year}`;
+ // typical climate estimate
+ const mo=['January','February','March','April','May','June','July','August','September','October','November','December'].indexOf(p.month),md=mo+(+p.day-1)/30.4;
+ const tm=c[3]+c[4]*Math.cos(2*Math.PI*(md-6.5)/12),dr=Math.abs(c[4])>8?4.5:3.5,now=tm+dr*Math.cos(2*Math.PI*(h+m/60-15)/24);
+ const ic=now<1?'❄️':now>32?'🥵':(h>=6&&h<18?'⛅':'🌙');
+ q.querySelector('.w').innerHTML=`<span><b>${ic} ~${fmtT(now)}</b><br><span style="color:var(--mut)">typical now · high ${fmtT(tm+dr)} / low ${fmtT(tm-dr)}</span></span><a href="https://www.google.com/search?q=weather+${encodeURIComponent(c[0]+' '+c[1])}" target="_blank" rel="noopener">Live forecast ↗</a>`;
+ const n=c[5];q.querySelector('.n').innerHTML=n?`📰 Top local source: <a href="${n.split('|')[1]}" target="_blank" rel="noopener">${n.split('|')[0]}</a>`:`📰 <a href="https://news.google.com/search?q=${encodeURIComponent(c[0])}" target="_blank" rel="noopener">News about ${c[0]} (Google News)</a>`;
+}
+DEF.forEach(mk);
+document.getElementById('rnd').onclick=()=>{
+ const pool=D.slice().sort(()=>Math.random()-.5);
+ cards.forEach((st,i)=>{const c=pool[i];st.name=c[0];st.f=null;st.el.querySelector('select').value=c[0]+', '+c[1];upd(st)})};
+setInterval(()=>cards.forEach(upd),1000);
+document.getElementById('u').onclick=()=>{F=!F;cards.forEach(upd)};
+</script></body></html>
